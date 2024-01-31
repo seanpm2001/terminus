@@ -2,14 +2,13 @@ import type * as MikroOrm from '@mikro-orm/core';
 import { Injectable, Scope } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { HealthIndicator, type HealthIndicatorResult } from '..';
-import { TimeoutError } from '../../errors';
 import { DatabaseNotConnectedError } from '../../errors/database-not-connected.error';
-import { HealthCheckError } from '../../health-check/health-check.error';
 import {
   TimeoutError as PromiseTimeoutError,
   promiseTimeout,
   checkPackages,
 } from '../../utils';
+import { HealthIndicatorService } from '../health-indicator.service';
 
 export interface MikroOrmPingCheckSettings {
   /**
@@ -31,12 +30,10 @@ export interface MikroOrmPingCheckSettings {
  */
 @Injectable({ scope: Scope.TRANSIENT })
 export class MikroOrmHealthIndicator extends HealthIndicator {
-  /**
-   * Initializes the MikroOrmHealthIndicator
-   *
-   * @param {ModuleRef} moduleRef The NestJS module reference
-   */
-  constructor(private moduleRef: ModuleRef) {
+  constructor(
+    private readonly moduleRef: ModuleRef,
+    private readonly healthIndicatorService: HealthIndicatorService,
+  ) {
     super();
     this.checkDependantPackages();
   }
@@ -55,12 +52,13 @@ export class MikroOrmHealthIndicator extends HealthIndicator {
     options: MikroOrmPingCheckSettings = {},
   ): Promise<HealthIndicatorResult> {
     this.checkDependantPackages();
+    const check = this.healthIndicatorService.check(key);
 
-    const connection = options.connection || this.getContextConnection();
     const timeout = options.timeout || 1000;
+    const connection = options.connection || this.getContextConnection();
 
     if (!connection) {
-      return this.getStatus(key, false);
+      return check.down();
     }
 
     try {
@@ -68,29 +66,16 @@ export class MikroOrmHealthIndicator extends HealthIndicator {
     } catch (error) {
       // Check if the error is a timeout error
       if (error instanceof PromiseTimeoutError) {
-        throw new TimeoutError(
-          timeout,
-          this.getStatus(key, false, {
-            message: `timeout of ${timeout}ms exceeded`,
-          }),
-        );
+        return check.down(`timeout of ${timeout}ms exceeded`);
       }
       if (error instanceof DatabaseNotConnectedError) {
-        throw new HealthCheckError(
-          error.message,
-          this.getStatus(key, false, {
-            message: error.message,
-          }),
-        );
+        return check.down(error.message);
       }
 
-      throw new HealthCheckError(
-        `${key} is not available`,
-        this.getStatus(key, false),
-      );
+      return check.down();
     }
 
-    return this.getStatus(key, true);
+    return check.up();
   }
 
   private checkDependantPackages() {
