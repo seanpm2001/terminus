@@ -38,46 +38,6 @@ export class MikroOrmHealthIndicator extends HealthIndicator {
     this.checkDependantPackages();
   }
 
-  /**
-   * Checks if responds in (default) 1000ms and
-   * returns a result object corresponding to the result
-   * @param key The key which will be used for the result object
-   * @param options The options for the ping
-   *
-   * @example
-   * MikroOrmHealthIndicator.pingCheck('database', { timeout: 1500 });
-   */
-  public async pingCheck(
-    key: string,
-    options: MikroOrmPingCheckSettings = {},
-  ): Promise<HealthIndicatorResult> {
-    this.checkDependantPackages();
-    const check = this.healthIndicatorService.check(key);
-
-    const timeout = options.timeout || 1000;
-    const connection = options.connection || this.getContextConnection();
-
-    if (!connection) {
-      return check.down();
-    }
-
-    try {
-      await this.pingDb(connection, timeout);
-    } catch (error) {
-      // Check if the error is a timeout error
-      if (error instanceof PromiseTimeoutError) {
-        return check.down(`timeout of ${timeout}ms exceeded`);
-      }
-      if (error instanceof DatabaseNotConnectedError) {
-        return check.down(error.message);
-      }
-
-      return check.down();
-    }
-
-    return check.up();
-  }
-
   private checkDependantPackages() {
     checkPackages(
       ['@mikro-orm/nestjs', '@mikro-orm/core'],
@@ -117,5 +77,45 @@ export class MikroOrmHealthIndicator extends HealthIndicator {
     };
 
     return await promiseTimeout(timeout, checker());
+  }
+
+  /**
+   * Checks if responds in (default) 1000ms and
+   * returns a result object corresponding to the result
+   * @param key The key which will be used for the result object
+   * @param options The options for the ping
+   *
+   * @example
+   * MikroOrmHealthIndicator.pingCheck('database', { timeout: 1500 });
+   */
+  public async pingCheck<Key extends string = string>(
+    key: Key,
+    options: MikroOrmPingCheckSettings = {},
+  ): Promise<HealthIndicatorResult<Key>> {
+    this.checkDependantPackages();
+    const check = this.healthIndicatorService.check(key);
+
+    const timeout = options.timeout || 1000;
+    const connection = options.connection || this.getContextConnection();
+
+    if (!connection) {
+      return check.down();
+    }
+
+    try {
+      await this.pingDb(connection, timeout);
+    } catch (error) {
+      // Check if the error is a timeout error
+      if (error instanceof PromiseTimeoutError) {
+        return check.down(`timeout of ${timeout}ms exceeded`);
+      }
+      if (error instanceof DatabaseNotConnectedError) {
+        return check.down(error.message);
+      }
+
+      return check.down();
+    }
+
+    return check.up();
   }
 }

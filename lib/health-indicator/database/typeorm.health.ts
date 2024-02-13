@@ -2,7 +2,7 @@ import { Injectable, Scope } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import type * as NestJSTypeOrm from '@nestjs/typeorm';
 import type * as TypeOrm from 'typeorm';
-import { HealthIndicator } from '../';
+import { HealthIndicator, type HealthIndicatorResult } from '../';
 import { MongoConnectionError } from '../../errors';
 import {
   TimeoutError as PromiseTimeoutError,
@@ -124,7 +124,7 @@ export class TypeOrmHealthIndicator extends HealthIndicator {
   async pingCheck<Key extends string>(
     key: Key,
     options: TypeOrmPingCheckSettings = {},
-  ) {
+  ): Promise<HealthIndicatorResult<Key>> {
     const check = this.healthIndicatorService.check(key);
     this.checkDependantPackages();
 
@@ -146,7 +146,7 @@ export class TypeOrmHealthIndicator extends HealthIndicator {
         return check.down(err.message);
       }
 
-      return check.down(`${key} is not available`);
+      return check.down();
     }
 
     return check.up();

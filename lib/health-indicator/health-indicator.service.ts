@@ -16,7 +16,7 @@ export class HealthIndicatorService {
 
 type AdditionalData = Record<string, any>;
 
-class HealthIndicatorSession<Key extends Readonly<string>> {
+export class HealthIndicatorSession<Key extends Readonly<string> = string> {
   constructor(private readonly key: Key) {}
 
   /**
